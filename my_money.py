@@ -18,18 +18,24 @@ def save_users(users):
     with open('users.json', 'w', encoding='utf-8') as f:
         json.dump(users, f, ensure_ascii=False, indent=4)
 
-# --- 사용자별 가계부 데이터 로드/저장 ---
-def load_data(userid):
+# --- 사용자별 가계부 데이터 로드 (속도 개선 캐시 적용) ---
+@st.cache_data(show_spinner=False)
+def load_data_cached(userid):
     file_path = f'user_data/{userid}.json'
     if os.path.exists(file_path):
-        return pd.read_json(file_path, encoding='utf-8')
+        try:
+            return pd.read_json(file_path, encoding='utf-8')
+        except:
+            pass
     return pd.DataFrame(columns=['날짜', '구분', '내용', '금액'])
 
 def save_data(userid, df):
     file_path = f'user_data/{userid}.json'
     df.to_json(file_path, orient='records', force_ascii=False, indent=4)
+    # 데이터를 저장한 후에는 캐시를 삭제해서 화면에 바로 반영되게 함
+    st.cache_data.clear()
 
-# --- 메인 로직 ---
+# --- 메인 설정 ---
 st.set_page_config(page_title="모두의 가계부", layout="wide")
 
 if 'user_id' not in st.session_state:
@@ -54,7 +60,6 @@ if st.session_state.user_id is None:
                 st.success("회원가입 완료! 로그인을 해주세요.")
             else:
                 st.warning("아이디와 비밀번호를 입력하세요.")
-
     else:
         st.subheader("🔑 로그인")
         username = st.text_input("아이디")
@@ -76,8 +81,8 @@ else:
 
     st.title("💰 개인별 스마트 가계부")
     
-    # 해당 유저의 데이터만 불러오기
-    user_df = load_data(st.session_state.user_id)
+    # 캐시된 함수로 데이터 불러오기 (속도 향상)
+    user_df = load_data_cached(st.session_state.user_id)
 
     with st.form("input_form", clear_on_submit=True):
         col1, col2, col3, col4 = st.columns([2, 2, 3, 2])
@@ -87,11 +92,14 @@ else:
         a = col4.number_input("금액", min_value=0, step=100)
         
         if st.form_submit_button("기록 저장"):
-            new_row = pd.DataFrame({'날짜': [str(d)], '구분': [t], '내용': [c], '금액': [a]})
-            user_df = pd.concat([user_df, new_row], ignore_index=True)
-            save_data(st.session_state.user_id, user_df)
-            st.success("저장되었습니다!")
-            st.rerun()
+            if c:
+                new_row = pd.DataFrame({'날짜': [str(d)], '구분': [t], '내용': [c], '금액': [a]})
+                user_df = pd.concat([user_df, new_row], ignore_index=True)
+                save_data(st.session_state.user_id, user_df)
+                st.success("저장되었습니다!")
+                st.rerun()
+            else:
+                st.warning("내용을 입력해주세요.")
 
     st.divider()
 
