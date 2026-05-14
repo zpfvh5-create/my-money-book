@@ -15,12 +15,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. 서비스 계정 인증 정보 재구성 (저장 권한 확보용)
-PK = st.secrets["private_key"].replace("\\n", "\n")
+# 2. 열쇠 정보를 코드 안에 직접 넣음 (KeyError 완전 방지)
+# 주의: 이 아래의 PK는 긴 문자열 한 줄입니다.
+PK = "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC9vt+E/N34kY8a\nIZKQ+mJYkNZR9X6sEFNf+ppEpsgAYtDzmg++5uubxU6zSkb14/VBUqlWy4Qf8wvp\nwSk73o9nLJEo3EMlUy2GJaEhnkZKfWUTu34CY9FC1htS01KTtIR3I8r0m3WhKzv/\nt0M9M5UNF9qFwABjvAWE2vctNM5cYyYfTLD/IZuPgl+qgRu09oK5GcrfxXBKy1CO\nS5v0KSH7obt50bXVavIW2lj+7oG6chU2mmPwuXZyoY5vZIkMv29AcBrgqgY92QZT\nICoxcKgtBO16MPgUIbgFrdW2Hc4+l0br2cw0b6BPNFsiVH4cEmm+q0Yp6nOCjUDz\nY5pnn5qPAgMBAAECggEABGAseL1Ow8wHiCC8vTR+TsXi9gzlQ5k0yFfXyubVtzyQ\nI63/2EqBpcaiY/wTMC8g7sVgkQHXJYLOBDFSKXFJI/tLywIZV6Otab81vLgRAugV\nYU5yP3fcfDVtIoyBBlWkCw37ljHSP/SRSPpe8JW0mugGlWMHdJqsvehBdFIYGC/0\nStBoPQwCqtpHNkt7HRjS+HsdsD15/gnOUKJaawQtPDMe9Eq2hyJihGMr8WHGmucl\nZ1UIroZxIS236f/fs44tgBVk/ZSHECofP98w4eUK5CxpvkHdatpBMg8XDyEiXJp2\noeRYIoA+iiczeY6CjgVG3+UsfO5c1nJ6iLGVkpOC8QKBgQDtkzg2U9jWFNFJbeuL\nP5VaXsk8YdULH2KpGDJGhf8xsV1UvVMATrLmXTDthlOwJmTaxGVTbBzP2Pta4jzO\nd22rX+qQJfPvgVTx0ex2h/sEGbsR5Itc0iiVrGpFD5jvof5ThYSGu6/jaoQG1JZ0\nDCOGXZssxBjsUfDhFGiuT7677QKBgQDMdg3dO1V3pBZ7btTKEKlOEwtrB59jjtEM\rhv6hRmFoCR5WvwHiQx1oW+L5k1ax5ZhNg6q9ekowOqPvuC//Mdd3KTAxJ4KMowV\haTzR8rg9iisCu3SBHweV9xGiOZo4DZiWCo+GfDo3dgkS5lu0GKY4FIYXReUmol2\ne7MOnvp46wKBgEGXedeWArHogXfSf0usvGF89fZT1GwDuEuTQJ4z9KcVnvz8YGQf\nVkk/xXhus8BYeVPlEUyc9r9z2sHW4I7obkD4dFxj/htMC9XP7Yc0N9uD9yATh16T\nL11TguuaSNEwWnVY0aQZQZB6IgV4wCk+CLjaMzOC2Ja2cNjTt6sYnUJpAoGBALjO\neEegiuciXOPi0Nl35+BXHHn4oNwXSeOhOE7foasDjhRW5flVqfplGfMlDoRgZQ+n\nEej7b21TunCFgpZmQDoZ5p0K2yKyf6Ywb2EqYjmmpiqjkkTDowC2P7dNpJ3lE6Me\nt8f8IKILa4ObBauBFa3DDNFSy66ZZGjA9J7hmdpTAoGBALmAFSeqob4GjMmplwX6\narb/zCdy0JVZHE7xaD90RWuSq/pRyem8kOVHAw0jM983qdH9j03mAT2H8KS1Z7I5\njfSi9xaQ/vWaqU9v76TpswLZqCon6dUk859Bk7sV0DBSp7YUIXiIJ3G783jCi6Y6\njVSJX1XGyMLqJQcZ0rWrV5G3\n-----END PRIVATE KEY-----\n"
+
 creds = {
     "type": "service_account",
     "project_id": "my-money-book-496306",
-    "private_key_id": st.secrets["key_id"],
+    "private_key_id": "5c18f0f54fccb507412e7f097a88f1ccb4e8e1f3",
     "private_key": PK,
     "client_email": "money-key@my-money-book-496306.iam.gserviceaccount.com",
     "client_id": "115839050069906584502",
@@ -30,13 +32,15 @@ creds = {
     "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/money-key%40my-money-book-496306.iam.gserviceaccount.com"
 }
 
-# 인증 정보를 명시적으로 전달하여 연결 생성
-conn = st.connection("gsheets", type=GSheetsConnection, **creds)
-url = st.secrets["spreadsheet"]
+# 3. 연결 및 데이터 처리
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection, **creds)
+    url = st.secrets["spreadsheet"]
+except Exception as e:
+    st.error(f"⚠️ 설정 오류: {e}")
 
 def load_data():
     try:
-        # 인증된 연결로 읽기
         df = conn.read(spreadsheet=url, ttl=0)
         if df is None or df.empty:
             return pd.DataFrame(columns=['날짜', '구분', '내용', '금액'])
@@ -46,58 +50,38 @@ def load_data():
 
 def save_data(df):
     try:
-        # 데이터 정리 후 인증된 연결로 업데이트
         df['금액'] = pd.to_numeric(df['금액'], errors='coerce').fillna(0).astype(int)
         conn.update(spreadsheet=url, data=df)
         st.cache_data.clear()
         return True
     except Exception as e:
-        # 에러 메시지를 더 자세히 표시
         st.error(f"⚠️ 저장 실패: {e}")
         return False
 
-# 3. 입력 창
-@st.dialog("내역 관리")
+# 4. 다이얼로그 및 화면 구성
+@st.dialog("내역 입력")
 def manage_entry(date_str):
     st.write(f"📅 **{date_str}**")
     all_df = load_data()
-    
-    col1, col2 = st.columns(2)
-    with col1: t = st.selectbox("구분", ["지출", "수입"])
-    with col2: a = st.number_input("금액", min_value=0, step=100)
+    t = st.selectbox("구분", ["지출", "수입"])
+    a = st.number_input("금액", min_value=0, step=100)
     c = st.text_input("내용", placeholder="기록 없음")
-    
     if st.button("💾 저장하기", use_container_width=True, type="primary"):
-        new_row = pd.DataFrame({
-            '날짜': [date_str],
-            '구분': [t],
-            '내용': [c.strip() if c.strip() else "기록 없음"],
-            '금액': [int(a)]
-        })
+        new_row = pd.DataFrame({'날짜': [date_str], '구분': [t], '내용': [c.strip() if c.strip() else "기록 없음"], '금액': [int(a)]})
         if save_data(pd.concat([all_df, new_row], ignore_index=True)):
-            st.success("성공!")
+            st.success("저장 완료!")
             time.sleep(1)
             st.rerun()
 
-# 4. 메인 화면
-st.title("💰 가계부")
+st.title("💰 내 가계부")
 data = load_data()
-
 events = []
 for _, r in data.iterrows():
     try:
         is_exp = r['구분'] == '지출'
-        events.append({
-            "title": f"{'-' if is_exp else '+'}{int(r['금액']):,}", 
-            "start": str(r['날짜']), 
-            "backgroundColor": "#FF4B4B" if is_exp else "#28A745",
-            "borderColor": "transparent"
-        })
+        events.append({"title": f"{'-' if is_exp else '+'}{int(r['금액']):,}", "start": str(r['날짜']), "backgroundColor": "#FF4B4B" if is_exp else "#28A745", "borderColor": "transparent"})
     except: continue
 
-state = calendar(events=events, options={"initialView": "dayGridMonth", "locale": "ko", "height": 600}, key="calendar_v8")
-
-if state.get("dateClick"): 
-    manage_entry(state["dateClick"]["date"].split("T")[0])
-elif state.get("eventClick"): 
-    manage_entry(state["eventClick"]["event"]["start"].split("T")[0])
+state = calendar(events=events, options={"initialView": "dayGridMonth", "locale": "ko", "height": 600}, key="calendar_final_v10")
+if state.get("dateClick"): manage_entry(state["dateClick"]["date"].split("T")[0])
+elif state.get("eventClick"): manage_entry(state["eventClick"]["event"]["start"].split("T")[0])
