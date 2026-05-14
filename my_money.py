@@ -8,12 +8,7 @@ from streamlit_gsheets import GSheetsConnection
 
 # --- 1. 페이지 설정 및 아이콘 ---
 icon_url = "https://cdn-icons-png.flaticon.com/512/2454/2454282.png" 
-
-st.set_page_config(
-    page_title="가계부",
-    page_icon="💰",
-    layout="wide"
-)
+st.set_page_config(page_title="가계부", page_icon="💰", layout="wide")
 
 st.markdown(f"""
     <link rel="apple-touch-icon" href="{icon_url}">
@@ -29,7 +24,7 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 데이터 및 사용자 관리 로직 ---
+# --- 2. 데이터 및 사용자 관리 ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1HfaQLS2kQYeTVM3fnYdrPiIR_8uYCA9hYeDUL8-dB3E/edit?gid=0#gid=0"
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -42,18 +37,27 @@ def save_users(users):
     with open('users.json', 'w', encoding='utf-8') as f:
         json.dump(users, f, ensure_ascii=False, indent=4)
 
-@st.cache_data(ttl=2, show_spinner=False)
+@st.cache_data(ttl=1, show_spinner=False)
 def load_data():
     try:
         df = conn.read(spreadsheet=SHEET_URL, ttl=0)
-        if df is None or df.empty: return pd.DataFrame(columns=['id', '날짜', '구분', '내용', '금액'])
+        if df is None or df.empty:
+            return pd.DataFrame(columns=['id', '날짜', '구분', '내용', '금액'])
+        # 필수 컬럼 강제 지정 (오류 방지)
+        df.columns = ['id', '날짜', '구분', '내용', '금액']
         df['id'] = df['id'].astype(str)
         return df
-    except: return pd.DataFrame(columns=['id', '날짜', '구분', '내용', '금액'])
+    except:
+        return pd.DataFrame(columns=['id', '날짜', '구분', '내용', '금액'])
 
 def save_data(df):
-    conn.update(spreadsheet=SHEET_URL, data=df)
-    st.cache_data.clear()
+    try:
+        # 데이터 정렬 및 타입 맞춤 (오류 원천 차단)
+        df = df[['id', '날짜', '구분', '내용', '금액']]
+        conn.update(spreadsheet=SHEET_URL, data=df)
+        st.cache_data.clear()
+    except Exception as e:
+        st.error(f"시트 저장 오류! 권한이나 컬럼명을 확인하세요: {e}")
 
 # --- 3. 입력 팝업 ---
 @st.dialog("기록 관리")
@@ -68,19 +72,21 @@ def manage_entry(date_str):
         a = c2.number_input("금액", min_value=0, step=100)
         c = st.text_input("내용")
         if st.form_submit_button("저장", use_container_width=True):
-            new_id = f"{uid}_{datetime.now().timestamp()}"
-            new_row = pd.DataFrame({'id': [new_id], '날짜': [date_str], '구분': [t], '내용': [c], '금액': [a]})
-            save_data(pd.concat([all_df, new_row], ignore_index=True))
-            st.rerun()
+            if uid:
+                new_id = f"{uid}_{datetime.now().timestamp()}"
+                new_row = pd.DataFrame({'id': [new_id], '날짜': [date_str], '구분': [t], '내용': [c], '금액': [a]})
+                save_data(pd.concat([all_df, new_row], ignore_index=True))
+                st.rerun()
 
     day_df = all_df[(all_df['날짜'] == date_str) & (all_df['id'].str.startswith(uid, na=False))]
     for _, row in day_df.iterrows():
         col_t, col_b = st.columns([4, 1])
         col_t.write(f"{'🔴' if row['구분']=='지출' else '🔵'} {int(row['금액']):,}원 ({row['내용']})")
         if col_b.button("🗑️", key=f"del_{row['id']}"):
-            save_data(all_df[all_df['id'] != row['id']]); st.rerun()
+            save_data(all_df[all_df['id'] != row['id']])
+            st.rerun()
 
-# --- 4. 메인 로직 (로그인 복구) ---
+# --- 4. 메인 로직 ---
 if 'user_id' not in st.session_state: st.session_state.user_id = None
 if 'login_page' not in st.session_state: st.session_state.login_page = 'login'
 
@@ -119,7 +125,7 @@ else:
         is_exp = r['구분'] == '지출'
         events.append({"id": r['id'], "title": f"{'-' if is_exp else '+'}{int(r['금액']):,}", "start": str(r['날짜']), "backgroundColor": "#FF4B4B" if is_exp else "#28A745", "borderColor": "transparent"})
 
-    state = calendar(events=events, options={"initialView": "dayGridMonth", "aspectRatio": 1.1, "locale": "ko"}, key="v14")
+    state = calendar(events=events, options={"initialView": "dayGridMonth", "aspectRatio": 1.1, "locale": "ko"}, key="v15")
 
     if state.get("dateClick"): manage_entry(state["dateClick"]["date"].split("T")[0])
     elif state.get("eventClick"): manage_entry(state["eventClick"]["event"]["start"].split("T")[0])
@@ -128,4 +134,4 @@ else:
         st.divider()
         i, e = my_data[my_data['구분'] == '수입']['금액'].sum(), my_data[my_data['구분'] == '지출']['금액'].sum()
         c1, c2, c3 = st.columns(3)
-        c1.metric("이번 달 수입", f"{i:,}원"); c2.metric("이번 달 지출", f"{e:,}원"); c3.metric("남은 잔액", f"{(i-e):,}원")
+        c1.metric("수입", f"{i:,}원"); c2.metric("지출", f"{e:,}원"); c3.metric("잔액", f"{(i-e):,}원")
